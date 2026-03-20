@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>お喋りピカチュウ（スマホ最適化版）</title>
+    <title>お喋りピカチュウ（音質重視）</title>
     <style>
         body { font-family: sans-serif; text-align: center; padding-top: 50px; background: #fff9e6; transition: background 0.3s; }
         body.playing { background: #ffeaa7; }
-        button { font-size: 20px; padding: 15px 30px; cursor: pointer; border-radius: 50px; border: none; background: #f1c40f; color: #333; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        button { font-size: 20px; padding: 15px 30px; cursor: pointer; border-radius: 50px; border: none; background: #f1c40f; color: #333; font-weight: bold; }
         #status { margin-top: 20px; color: #7f8c8d; font-size: 14px; }
         #result-box { margin-top: 30px; padding: 20px; background: white; border-radius: 15px; display: inline-block; min-width: 300px; border: 3px solid #f1c40f; }
         #final { font-size: 24px; font-weight: bold; color: #2c3e50; }
-        #lock-status { color: #e74c3c; font-size: 12px; margin-top: 5px; height: 15px; }
+        #lock-status { color: #e74c3c; font-size: 14px; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <h1>お喋り反応アプリ</h1>
-    <div id="status">スマホ最適化済みやで！</div>
+    <div id="status">音切れ対策版（マイク切替方式）</div>
     
     <button id="startBtn">音声認識スタート</button>
     
@@ -36,13 +36,8 @@
             "綺麗", "きれい", "キレイ", "美しい", "うつくしい"
         ];
 
-        // --- 音源のリサイクル準備 ---
-        const soundSources = ["pika1.mp3", "pika2.mp3", "pika3.mp3", "pika4.mp3"];
-        const nightSource = "pika5.mp3";
-        
-        // Audioオブジェクトをあらかじめ作っておく（メモリ節約のキモ！）
-        const audioPool = soundSources.map(src => new Audio(src));
-        const nightAudio = new Audio(nightSource);
+        const soundFiles = ["pika1.mp3", "pika2.mp3", "pika3.mp3", "pika4.mp3"];
+        const nightSpecialSound = "pika5.mp3"; 
 
         const startBtn = document.getElementById('startBtn');
         const finalSpan = document.getElementById('final');
@@ -55,28 +50,24 @@
         recognition.interimResults = false;
 
         let isRunning = false;
-        let isPlaying = false;
+        let isPlaying = false; 
 
         startBtn.addEventListener('click', () => {
             if (isRunning) return;
-            
-            // 【重要】スマホのブラウザ対策：
-            // ユーザーがボタンを押した瞬間に全音源を一度「空再生」して
-            // スマホの音声システムに「これから音出すで！」と登録させる
-            audioPool.forEach(audio => { audio.play().then(() => audio.pause()); });
-            nightAudio.play().then(() => nightAudio.pause());
-
             recognition.start();
         });
 
         recognition.onstart = () => {
             isRunning = true;
+            isPlaying = false;
             startBtn.style.background = "#2ecc71";
             startBtn.innerText = "聴いてるで…";
+            lockStatus.innerText = "マイクON：喋ってOK";
         };
 
         recognition.onresult = (event) => {
             if (isPlaying) return;
+
             const last = event.results.length - 1;
             let text = event.results[last][0].transcript.trim();
             finalSpan.innerText = text;
@@ -86,46 +77,58 @@
             }
         };
 
-        recognition.onend = () => { if (isRunning) recognition.start(); };
+        // 音声認識が勝手に止まった時の処理
+        recognition.onend = () => {
+            // 再生中じゃないのに止まったら、自動で再開する
+            if (isRunning && !isPlaying) {
+                console.log("マイクを再開します...");
+                recognition.start();
+            }
+        };
 
         function playRandomSound() {
             if (isPlaying) return;
             isPlaying = true;
             
-            document.body.classList.add('playing');
-            lockStatus.innerText = "ピカチュウお喋り中...";
-
-            // 鳴らす音源を決定
-            let audio;
-            const hour = new Date().getHours();
-            if (hour >= 20 || hour < 5) {
-                audio = nightAudio;
-            } else {
-                audio = audioPool[Math.floor(Math.random() * audioPool.length)];
-            }
-
-            // 【リサイクル再生のコツ】
-            audio.currentTime = 0; // 再生位置を最初に戻す
+            // 【対策1】再生する直前にマイクを完全に止める！
+            recognition.stop(); 
             
-            // 再生が終わった時の処理を1回だけ登録
+            document.body.classList.add('playing');
+            lockStatus.innerText = "マイクOFF：ピカチュウ再生中...";
+
+            let pool = [...soundFiles];
+            const hour = new Date().getHours();
+            if (hour >= 20 || hour < 5) pool.push(nightSpecialSound);
+
+            const randomIndex = Math.floor(Math.random() * pool.length);
+            // 【対策2】毎回新しいAudioオブジェクトを作る（結局これが一番安定する）
+            const audio = new Audio(pool[randomIndex]);
+
             audio.onended = () => {
+                // 音が終わったら
                 setTimeout(() => {
                     isPlaying = false;
                     document.body.classList.remove('playing');
-                    lockStatus.innerText = "";
-                }, 500); // 10msだとスマホには短すぎるので500msくらいが安全
+                    // 【対策3】再生が終わってからマイクを再起動する
+                    if (isRunning) {
+                        recognition.start();
+                    }
+                }, 300); // 0.3秒だけ余韻を置いて再開
             };
 
             audio.play().catch(e => {
-                console.log("再生エラー:", e);
+                console.log("再生失敗:", e);
                 isPlaying = false;
-                document.body.classList.remove('playing');
+                recognition.start();
             });
         }
 
+        // 自動再生
         setInterval(() => {
             if (!isRunning || isPlaying) return;
-            if (Math.random() < 0.2) playRandomSound();
+            if (Math.random() < 0.2) {
+                playRandomSound();
+            }
         }, 50000); 
 
     </script>
