@@ -3,45 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>お喋り反応アプリ（修正版）</title>
+    <title>お喋りピカチュウ</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding-top: 50px; background: #fff9e6; }
-        button { font-size: 20px; padding: 15px 30px; cursor: pointer; border-radius: 50px; border: none; background: #f1c40f; color: #333; font-weight: bold; }
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; background: #fff9e6; transition: background 0.3s; }
+        /* 再生中に背景を少し変えて、今「お休み中」なのを分かりやすくする */
+        body.playing { background: #ffeaa7; }
+        
+        button { font-size: 20px; padding: 15px 30px; cursor: pointer; border-radius: 50px; border: none; background: #f1c40f; color: #333; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         #status { margin-top: 20px; color: #7f8c8d; font-size: 14px; }
         #result-box { margin-top: 30px; padding: 20px; background: white; border-radius: 15px; display: inline-block; min-width: 300px; border: 3px solid #f1c40f; }
         #final { font-size: 24px; font-weight: bold; color: #2c3e50; }
-        .info { margin-top: 20px; font-size: 14px; color: #e67e22; }
+        #lock-status { color: #e74c3c; font-size: 12px; margin-top: 5px; height: 15px; }
     </style>
 </head>
 <body>
 
     <h1>お喋り反応アプリ</h1>
-    <div id="status">ループ対策済みやで！</div>
+    <div id="status">ピカチュウ待機中…</div>
     
     <button id="startBtn">音声認識スタート</button>
     
     <div id="result-box">
         <div id="final">（ここに言葉が出るで）</div>
+        <div id="lock-status"></div>
     </div>
 
-    <p class="info">※ 自動お喋りは「たまーに」鳴るようにしたやで。</p>
-
     <script>
-        const triggerWords = ["お疲れ様", "ピカチュウ", "ケチャップ", 
-            "おはよう", "おやすみ", "いただきます", "ごちそうさまでした","元気",
-            "大好き","可愛い","かわいい","仲間","ただいま","帰ろう",
-            "ありがとう","寝る","どうしたの","どう","すき","好き",
-            "かえろう","見て","みて","綺麗","きれい"];
-        const soundFiles = [
-            "pika1.mp3",
-            "pika2.mp3",
-            "pika3.mp3",
-            "pika4.mp3"
+        // --- 反応ワードリストを大幅強化！ ---
+        const triggerWords = [
+            "お疲れ様", "ピカチュウ", "ケチャップ", "おはよう", "おやすみ", 
+            "いただきます", "ごちそうさまでした", "元気", "大好き", "可愛い", 
+            "かわいい", "仲間", "ただいま", "帰ろう", "ありがとう", "寝る", 
+            "どうしたの", "どう", "すき", "好き", "かえろう",
+            // 「みて」のバリエーション
+            "見て", "みて", "ミテ", "みせて", "見せて", "観て",
+            // 「きれい」のバリエーション
+            "綺麗", "きれい", "キレイ", "美しい", "うつくしい"
         ];
+
+        const soundFiles = ["pika1.mp3", "pika2.mp3", "pika3.mp3", "pika4.mp3"];
         const nightSpecialSound = "pika5.mp3"; 
 
         const startBtn = document.getElementById('startBtn');
         const finalSpan = document.getElementById('final');
+        const lockStatus = document.getElementById('lock-status');
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
@@ -50,7 +55,7 @@
         recognition.interimResults = false;
 
         let isRunning = false;
-        let isPlaying = false; // 再生中かどうかを判定するフラグ
+        let isPlaying = false;
 
         startBtn.addEventListener('click', () => {
             if (isRunning) return;
@@ -64,13 +69,15 @@
         };
 
         recognition.onresult = (event) => {
-            // 再生中なら反応しない（無限ループ防止）
             if (isPlaying) return;
 
             const last = event.results.length - 1;
-            const text = event.results[last][0].transcript.trim();
+            let text = event.results[last][0].transcript.trim();
+            
+            // 認識された文字を画面に出す（ここでどう認識されたか確認できる）
             finalSpan.innerText = text;
 
+            // 判定！
             const hit = triggerWords.some(word => text.includes(word));
             if (hit) {
                 playRandomSound();
@@ -80,8 +87,12 @@
         recognition.onend = () => { if (isRunning) recognition.start(); };
 
         function playRandomSound() {
-            if (isPlaying) return; // 重複再生防止
-            isPlaying = true; // 「再生中」にする
+            if (isPlaying) return;
+            isPlaying = true;
+            
+            // 視覚的に「今は反応しないよ」とわかるようにする
+            document.body.classList.add('playing');
+            lockStatus.innerText = "ピカチュウお喋り中...";
 
             let pool = [...soundFiles];
             const hour = new Date().getHours();
@@ -90,29 +101,25 @@
             const randomIndex = Math.floor(Math.random() * pool.length);
             const audio = new Audio(pool[randomIndex]);
 
-            // 音声が鳴り終わったら
             audio.onended = () => {
-                // 3秒待ってからマイク入力を有効にする（残響を拾わないため）
+                // クールダウンを少し短く（1.5秒）してみたで
                 setTimeout(() => {
                     isPlaying = false;
-                    console.log("マイク再開や");
-                }, 3000);
+                    document.body.classList.remove('playing');
+                    lockStatus.innerText = "";
+                }, 1500); 
             };
 
             audio.play().catch(e => {
                 isPlaying = false;
-                console.log("再生失敗：", e);
+                document.body.classList.remove('playing');
             });
         }
 
-        // --- 勝手に喋る（自動再生）機能 ---
-        // 5分（300,000ミリ秒）ごとに抽選
+        // 自動再生（50秒ごとに20%）
         setInterval(() => {
             if (!isRunning || isPlaying) return;
-            
-            const rand = Math.random();
-            if (rand < 0.2) { // 5%の確率で当たる
-                console.log("気まぐれ抽選に当選！");
+            if (Math.random() < 0.2) {
                 playRandomSound();
             }
         }, 50000); 
