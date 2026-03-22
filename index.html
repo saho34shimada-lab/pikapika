@@ -19,7 +19,7 @@
     <div id="result">ここに言葉が出るで</div>
 
     <script>
-        const triggerWords = ["お疲れ様", "ピカチュウ", "おはよう", "おやすみ", "元気", "大好き", "可愛い", "ただいま", "ありがとう", "見て", "みて", "綺麗", "きれい"];
+        const triggerWords = ["お疲れ様","ケチャップ","かわいい", "ピカチュウ", "おはよう", "おやすみ", "元気", "大好き", "可愛い", "ただいま", "ありがとう", "見て", "みて", "綺麗", "きれい"];
         const soundFiles = ["pika1.mp3", "pika2.mp3", "pika3.mp3", "pika4.mp3",];
         
         const startBtn = document.getElementById('startBtn');
@@ -107,7 +107,7 @@
                 const pickedFile = soundFiles[Math.floor(Math.random() * 4)];
                 playBuffer(pickedFile);
             }
-        }, 300000); // 5分
+        }, 30000); // 5分
 
     </script>
 </body>
